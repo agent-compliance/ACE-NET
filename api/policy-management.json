@@ -1,0 +1,229 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ACE-NET Policy Management API",
+    "description": "API for Create, Read, Update, and Delete (CRUD) operations on ACE-NET compliance policies. The structure of policies is derived from the ace-policy.yang model.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.ace.net/v1/management",
+      "description": "Production Server"
+    }
+  ],
+  "paths": {
+    "/policies": {
+      "get": {
+        "summary": "List all Compliance Policies",
+        "operationId": "listPolicies",
+        "tags": ["Policy"],
+        "responses": {
+          "200": {
+            "description": "A list of policies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Policy"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Compliance Policy",
+        "operationId": "createPolicy",
+        "tags": ["Policy"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Policy created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policies/{policyId}": {
+      "parameters": [
+        {
+          "name": "policyId",
+          "in": "path",
+          "required": true,
+          "description": "Unique identifier of the policy.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get a specific Compliance Policy",
+        "operationId": "getPolicyById",
+        "tags": ["Policy"],
+        "responses": {
+          "200": {
+            "description": "The requested policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Policy not found."
+          }
+        }
+      },
+      "put": {
+        "summary": "Update an existing Compliance Policy",
+        "operationId": "updatePolicy",
+        "tags": ["Policy"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Policy not found."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Compliance Policy",
+        "operationId": "deletePolicy",
+        "tags": ["Policy"],
+        "responses": {
+          "204": {
+            "description": "Policy deleted successfully."
+          },
+          "404": {
+            "description": "Policy not found."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Rule": {
+        "type": "object",
+        "description": "A single rule within a policy. This is a simplified JSON representation of the ace-policy.yang rule structure.",
+        "properties": {
+          "rule-id": {
+            "type": "string",
+            "description": "Unique identifier for the rule within the policy.",
+            "example": "rule-cpu-usage-high"
+          },
+          "description": {
+            "type": "string",
+            "example": "Ensure CPU usage does not exceed 80% for 5 minutes."
+          },
+          "rule-type": {
+            "type": "string",
+            "enum": ["metric-based-threshold", "state-assertion", "api-call-sequence-validation", "eca-logic"]
+          },
+          "rule-logic": {
+            "type": "object",
+            "description": "The specific logic for the chosen rule-type. The structure will vary."
+          }
+        },
+        "required": ["rule-id", "rule-type", "rule-logic"]
+      },
+      "Policy": {
+        "type": "object",
+        "description": "Represents a full compliance policy, including system-generated fields.",
+        "properties": {
+          "policy-id": {
+            "type": "string",
+            "description": "Unique identifier for the policy, assigned by the system.",
+            "example": "policy-k8s-security-baseline",
+            "readOnly": true
+          },
+          "version": {
+            "type": "string",
+            "example": "1.1",
+            "readOnly": true
+          },
+          "description": {
+            "type": "string",
+            "example": "Security baseline policy for all Kubernetes clusters."
+          },
+          "is-enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "scope": {
+            "type": "object"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            }
+          }
+        },
+        "required": ["policy-id", "description", "rules"]
+      },
+      "PolicyInput": {
+        "type": "object",
+        "description": "Represents a policy for creation or update operations.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Security baseline policy for all Kubernetes clusters."
+          },
+          "is-enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "scope": {
+            "type": "object",
+            "example": { "target-type": "agent", "agent-type": ["k8s-agent"] }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            }
+          }
+        },
+        "required": ["description", "rules"]
+      }
+    }
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ACE-NET Audit and Reporting API",
+    "description": "API for retrieving compliance reports and audit records. The data structures are defined by the ace-audit.yang model.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.ace.net/v1/reporting",
+      "description": "Production Server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/reports": {
+      "get": {
+        "summary": "List all Compliance Reports",
+        "description": "Retrieves a list of compliance reports, with optional filtering.",
+        "operationId": "listReports",
+        "tags": ["Reporting"],
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "query",
+            "description": "Filter reports by the agent or component ID that generated them.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "description": "Filter reports by overall status (pass, fail, etc.).",
+            "schema": {
+              "type": "string",
+              "enum": ["pass", "fail", "warning", "indeterminate"]
+            }
+          },
+          {
+            "name": "timestamp_start",
+            "in": "query",
+            "description": "The start of the time range for report timestamps (RFC3339 format).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "timestamp_end",
+            "in": "query",
+            "description": "The end of the time range for report timestamps (RFC3339 format).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of compliance reports.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceReport"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{reportId}": {
+      "get": {
+        "summary": "Get a specific Compliance Report",
+        "operationId": "getReportById",
+        "tags": ["Reporting"],
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the report.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested compliance report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Authentication for the API using a JSON Web Token (JWT). The token should be provided in the 'Authorization' header as 'Bearer <token>'. This is suitable for secure, stateless authentication in telecom environments."
+      }
+    },
+    "schemas": {
+      "RuleEvaluationResult": {
+        "type": "object",
+        "properties": {
+          "result-id": {"type": "string"},
+          "policy-id": {"type": "string"},
+          "rule-id": {"type": "string"},
+          "status": {"type": "string", "enum": ["pass", "fail", "not-applicable", "error"]},
+          "observed-value": {"type": "string"},
+          "expected-value": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      },
+      "RemediationAction": {
+        "type": "object",
+        "properties": {
+          "action-id": {"type": "string", "format": "uuid"},
+          "action-type": {"type": "string"},
+          "status": {"type": "string", "enum": ["triggered", "completed", "failed"]},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "details": {"type": "string"}
+        }
+      },
+      "EvidenceReference": {
+          "type": "object",
+          "properties": {
+              "evidence-id": {"type": "string"},
+              "evidence-uri": {"type": "string", "format": "uri"},
+              "description": {"type": "string"}
+          }
+      },
+      "ComplianceReport": {
+        "type": "object",
+        "description": "A complete compliance report, structured by the ace-audit.yang model.",
+        "properties": {
+          "report-id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlation-id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "overall-status": {"type": "string", "enum": ["pass", "fail", "warning", "indeterminate"]},
+              "total-rules-evaluated": {"type": "integer"},
+              "rules-passed": {"type": "integer"},
+              "rules-failed": {"type": "integer"},
+              "score": {"type": "integer", "format": "int32"}
+            }
+          },
+          "rule-evaluation-results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleEvaluationResult"
+            }
+          },
+          "evidence-references": {
+              "type": "array",
+              "items": {
+                  "$ref": "#/components/schemas/EvidenceReference"
+              }
+          },
+          "remediation-actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemediationAction"
+            }
+          }
+        }
+      }
+    }
+  }
+}

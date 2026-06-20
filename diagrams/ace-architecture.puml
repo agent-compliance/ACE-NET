@@ -1,0 +1,53 @@
+@startuml
+!theme vibrant
+
+title ACE-NET High-Level Architecture
+
+package "ACE-NET Framework" {
+  [ACE-NET Core Engine] as Core
+  [Reporting Database] as DB
+  [Policy Engine] as Policy
+
+  Core --down-> DB : Stores/Retrieves\nTest Results
+  Core --right-> Policy : Evaluates Against\nPolicies
+}
+
+package "Telecom Environment" {
+  [Telecom Environment Adapter (TEA)] as TEA
+  [Network Orchestrator] as Orch
+  frame "Test Environment" {
+    [Agent Under Test (AUT)] as AUT
+    [Test Stimulus & Monitor] as Stim
+  }
+}
+
+actor "Operator / CI/CD" as Operator
+
+Operator -right-> Core : Submits Agent Profile\n(Phase 1)
+Core -right-> Orch : Requests Env Provisioning\n(Phase 2)
+Orch --down-> TEA : Manages Test Env Lifecycle
+
+TEA --down-> Stim : Deploys & Configures AUT\n(Phase 3)
+TEA <--> Stim : Applies Stimulus,\nMonitors Behavior
+AUT <-up- Stim : Stimulus
+AUT -down-> Stim : Logs, Metrics
+
+Stim --up-> TEA : Streams Data
+TEA --up-> Core : Forwards Test Data
+Core --left-> Operator : Provides Certificate\n(Phase 4)
+
+note right of Core
+  **Core Engine:**
+  - Manages test lifecycle
+  - Orchestrates phases
+  - Issues certificates
+end note
+
+note left of TEA
+  **Telecom Env. Adapter (TEA):**
+  - Abstracts underlying network
+  - Deploys/tears down AUT
+  - Manages test tools
+end note
+
+@enduml

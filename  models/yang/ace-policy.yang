@@ -1,0 +1,387 @@
+module ace-policy {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ace-policy";
+  prefix acep;
+
+  import ietf-inet-types {
+    prefix inet;
+    reference "RFC 6991: Common YANG Data Types";
+  }
+  import ietf-yang-types {
+    prefix yang;
+    reference "RFC 6991: Common YANG Data Types";
+  }
+
+  organization
+    "ACE-NET Consortium";
+  contact
+    "Editor: <mailto:editor@ace-net.example.com>";
+
+  description
+    "This YANG module defines a data model for representing compliance
+     policies within the ACE-NET framework. It includes structures for
+     policy metadata, scope, a flexible rule engine with various rule
+     types, and remediation actions upon violation.";
+
+  revision 2026-06-20 {
+    description
+      "Initial version of the ACE-NET compliance policy model.";
+    reference
+      "draft-doe-ace-net-framework-00";
+  }
+
+  /*
+   * Typedefs for commonly used types
+   */
+  typedef policy-id-type {
+    type string;
+    description
+      "A unique identifier for a policy.";
+  }
+
+  typedef rule-id-type {
+    type string;
+    description
+      "A unique identifier for a rule within a policy.";
+  }
+
+
+  /*
+   * Groupings for Reusable Data Structures
+   */
+
+  grouping policy-metadata-grouping {
+    description
+      "A reusable grouping for common policy metadata.";
+    leaf policy-id {
+      type policy-id-type;
+      mandatory true;
+      description
+        "The unique identifier for this policy.";
+    }
+    leaf version {
+      type string;
+      default "1.0";
+      description
+        "The version of the policy.";
+    }
+    leaf description {
+      type string;
+      description
+        "A human-readable description of the policy.";
+    }
+    leaf is-enabled {
+      type boolean;
+      default true;
+      description
+        "Indicates if the policy is currently enabled and enforced.";
+    }
+  }
+
+  grouping policy-scope-grouping {
+    description
+      "A reusable grouping for defining the scope of a policy.
+       The policy can target specific network functions, services, slices,
+       or agent types.";
+    container scope {
+      description
+        "Defines the targets to which this policy applies.";
+      choice target-type {
+        mandatory true;
+        description
+          "The type of entity this policy targets.";
+        case network-function {
+          leaf-list network-function-id {
+            type string;
+            description
+              "Identifier for one or more targeted network functions (NFs).";
+          }
+        }
+        case service {
+          leaf-list service-id {
+            type string;
+            description
+              "Identifier for one or more targeted services.";
+          }
+        }
+        case slice {
+          leaf-list slice-id {
+            type string;
+            description
+              "Identifier for one or more targeted network slices.";
+          }
+        }
+        case agent {
+          leaf-list agent-type {
+            type string;
+            description
+              "Identifier for one or more targeted agent types or groups.";
+          }
+        }
+        case all-inclusive {
+          leaf all {
+            type empty;
+            description
+              "The policy applies to all entities in the administrative domain.";
+          }
+        }
+      }
+    }
+  }
+
+  grouping remediation-action-grouping {
+    description
+      "A reusable grouping for defining remediation actions upon a
+       policy violation.";
+    container remediation-actions {
+      description
+        "A list of actions to be executed upon policy violation.";
+      list action {
+        key "action-id";
+        ordered-by user;
+        description
+          "An ordered list of remediation actions.";
+        leaf action-id {
+          type string;
+          description "A unique ID for the action in this list.";
+        }
+        choice action-type {
+          mandatory true;
+          description "The type of remediation action to perform.";
+          case notify {
+            container notify {
+              description "Sends a notification.";
+              leaf destination {
+                type inet:uri;
+                description "The endpoint to send the notification to (e.g., a webhook URL).";
+              }
+              leaf message {
+                type string;
+                description "The notification message content.";
+              }
+            }
+          }
+          case log {
+            leaf log {
+              type empty;
+              description "Logs the violation details to the system log.";
+            }
+          }
+          case quarantine {
+            container quarantine {
+              description "Quarantines the non-compliant entity.";
+              leaf-list target-resource {
+                type yang:xpath1.0;
+                description
+                  "An XPath expression pointing to the resource to be quarantined.";
+              }
+              leaf reason {
+                type string;
+                description "Reason for quarantining.";
+              }
+            }
+          }
+          case rollback {
+            container rollback {
+              description "Initiates a rollback to a previous known-good state.";
+              leaf target-config-snapshot {
+                type string;
+                description "Identifier for the configuration snapshot to roll back to.";
+              }
+            }
+          }
+          case custom-action {
+             leaf custom-script {
+                type string;
+                description "Path or name of a custom script to execute.";
+             }
+          }
+        }
+      }
+    }
+  }
+
+  grouping rule-base-grouping {
+    description "Base information for a rule.";
+    leaf rule-id {
+      type rule-id-type;
+      mandatory true;
+      description "Unique identifier for this rule within the policy.";
+    }
+    leaf description {
+      type string;
+      description "A human-readable description of the rule's purpose.";
+    }
+  }
+
+  grouping metric-threshold-rule-grouping {
+    description
+      "Defines a rule based on a metric exceeding a threshold.";
+    leaf metric-name {
+      type string;
+      mandatory true;
+      description "The name of the metric to monitor (e.g., 'cpu.usage.percent').";
+    }
+    leaf operator {
+      type enumeration {
+        enum greater-than;
+        enum less-than;
+        enum equal-to;
+        enum not-equal-to;
+      }
+      mandatory true;
+      description "The comparison operator.";
+    }
+    leaf threshold-value {
+      type decimal64 {
+        fraction-digits 2;
+      }
+      mandatory true;
+      description "The threshold value.";
+    }
+    leaf duration {
+      type uint32;
+      units "seconds";
+      description "The duration for which the condition must hold true before the rule is triggered.";
+    }
+  }
+
+  grouping state-assertion-rule-grouping {
+    description "Defines a rule based on asserting a specific state.";
+    leaf state-path {
+      type yang:xpath1.0;
+      mandatory true;
+      description "An XPath expression pointing to the state data node to check.";
+    }
+    leaf operator {
+      type enumeration {
+        enum is;
+        enum is-not;
+      }
+      mandatory true;
+      description "The comparison operator.";
+    }
+    leaf expected-value {
+      type string;
+      mandatory true;
+      description "The expected value of the state data node.";
+    }
+  }
+
+  grouping api-sequence-rule-grouping {
+    description
+      "Defines a rule to validate a sequence of API calls.";
+    list api-call-sequence {
+      ordered-by user;
+      min-elements 2;
+      description "The ordered sequence of API calls to validate.";
+      key "step";
+      leaf step {
+        type uint32;
+        description "The order of the API call in the sequence.";
+      }
+      leaf api-endpoint {
+        type string;
+        description "The API endpoint or function name.";
+      }
+      leaf expected-parameters {
+        type string;
+        description "A representation of expected parameters (e.g., in JSON format).";
+      }
+    }
+    leaf time-window {
+      type uint32;
+      units "seconds";
+      description "The maximum time window within which the sequence must complete.";
+    }
+  }
+
+  grouping eca-rule-grouping {
+    description "Defines an Event-Condition-Action (ECA) rule.";
+    container event {
+      description "The event that triggers the rule evaluation.";
+      leaf event-stream {
+        type string;
+        description "The name of the event stream to subscribe to (e.g., 'syslog', 'netconf-notifications').";
+      }
+      leaf filter {
+        type string;
+        description "A filter expression (e.g., XPath, regex) to match specific events within the stream.";
+      }
+    }
+    container condition {
+      description "A condition that must be true for the action to be executed.";
+      leaf condition-logic {
+        type string;
+        description
+          "A logical expression to evaluate against context or state data.
+           The expression language is defined by the implementing system.";
+      }
+    }
+    container action {
+      description "The action to execute if the event occurs and the condition is met.";
+      uses remediation-action-grouping;
+    }
+  }
+
+
+  /*
+   * The Main Data Model for Compliance Policies
+   */
+
+  container policies {
+    description
+      "The top-level container for all compliance policies.";
+
+    list policy {
+      key "policy-id";
+      description
+        "A list of compliance policies defined for the ACE-NET framework.";
+
+      uses policy-metadata-grouping;
+      uses policy-scope-grouping;
+
+      container rules {
+        description
+          "A container for the rules that make up this policy.";
+        list rule {
+          key "rule-id";
+          ordered-by user;
+          description "An ordered list of rules to be evaluated for this policy.";
+
+          uses rule-base-grouping;
+
+          choice rule-type {
+            mandatory true;
+            description
+              "The specific type of logic this rule implements.";
+
+            case metric-based-threshold {
+              description "A rule for checking if a metric crosses a threshold.";
+              uses metric-threshold-rule-grouping;
+            }
+
+            case state-assertion {
+              description "A rule for asserting a specific configuration or operational state.";
+              uses state-assertion-rule-grouping;
+            }
+
+            case api-call-sequence-validation {
+              description "A rule for validating a sequence of API calls.";
+              uses api-sequence-rule-grouping;
+            }
+
+            case eca-logic {
+              description "A rule based on Event-Condition-Action (ECA) logic.";
+              uses eca-rule-grouping;
+            }
+          } // choice rule-type
+        } // list rule
+      } // container rules
+
+      // Global remediation actions for the policy if any rule is violated.
+      uses remediation-action-grouping;
+
+    } // list policy
+  } // container policies
+}

@@ -1,0 +1,75 @@
+@startuml
+!theme vibrant
+
+title Phase 3: Test Execution Sequence
+
+actor Operator
+participant "ACE-NET Core" as Core
+participant "Network Orchestrator" as Orch
+participant "Telecom Env. Adapter\n(TEA)" as TEA
+box "Test Environment" #LightBlue
+  participant "Test Stimulus\n& Monitor" as Stim
+  participant "Agent Under Test\n(AUT)" as AUT
+end box
+
+
+== Test Environment Provisioning ==
+Core -> Orch: ProvisionTestEnv(testSpec)
+activate Orch
+Orch -> TEA: CreateSandbox(testSpec)
+activate TEA
+TEA -> Stim: setup_environment()
+activate Stim
+Stim --> TEA: ack
+deactivate Stim
+TEA --> Orch: ack
+deactivate TEA
+Orch --> Core: ack
+deactivate Orch
+
+== Agent Deployment ==
+Core -> TEA: DeployAgent(agentArtifactUrl)
+activate TEA
+TEA -> Stim: deploy_agent(agentArtifactUrl)
+activate Stim
+Stim -> AUT: <<create>>
+Stim -> AUT: configure()
+activate AUT
+AUT --> Stim: ready
+deactivate AUT
+Stim --> TEA: ack(agentEndpoint)
+deactivate Stim
+TEA --> Core: ack
+deactivate TEA
+
+== Test Stimulus & Monitoring ==
+Core -> TEA: ExecuteTest(policyProfileId)
+activate TEA
+TEA -> Stim: start_monitoring()
+activate Stim
+TEA -> Stim: apply_stimulus(stimulus_data)
+Stim -> AUT: <<stimulus>>
+activate AUT
+AUT --> Stim: (logs, metrics, traffic)
+deactivate AUT
+Stim --> TEA: (streaming data)
+deactivate Stim
+TEA -> Core: (streaming data)
+note right of TEA: Data is forwarded for real-time analysis against policy.
+
+== Environment Teardown ==
+Core -> Orch: TeardownTestEnv(testRunId)
+activate Orch
+Orch -> TEA: DestroySandbox(testRunId)
+activate TEA
+TEA -> Stim: teardown()
+activate Stim
+Stim -> AUT: <<destroy>>
+Stim --> TEA: ack
+deactivate Stim
+TEA --> Orch: ack
+deactivate TEA
+Orch --> Core: ack
+deactivate Orch
+
+@enduml

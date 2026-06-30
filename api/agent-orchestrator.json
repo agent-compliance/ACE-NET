@@ -2,33 +2,29 @@
   "openapi": "3.0.0",
   "info": {
     "title": "ACE-NET Agent-Orchestrator Interaction API",
-    "version": "1.0.0",
-    "description": "API for network orchestrators to manage the compliance lifecycle of an Agent Under Test (AUT) within the ACE-NET framework."
+    "version": "2.0.0",
+    "description": "API for network orchestrators and CI/CD systems to manage the ACE-NET three-layer certification lifecycle."
   },
-  "servers": [
-    {
-      "url": "https://ace-net.example.com/api/v1"
-    }
-  ],
+  "servers": [{ "url": "https://ace-net.example.com/api/v1" }],
+  "security": [{ "bearerAuth": [] }],
   "paths": {
     "/agents/submissions": {
       "post": {
-        "summary": "Submit Agent for Testing",
-        "description": "Submits an Agent Profile to initiate a new compliance test run. The test is asynchronous. A unique testRunId is returned to track the execution.",
-        "operationId": "submitAgentForTesting",
+        "summary": "Submit Agent for Certification",
+        "description": "Submits a signed Agent Profile to initiate a new certification run. The run is asynchronous across all applicable layers. Returns a testRunId for status polling.",
+        "operationId": "submitAgentForCertification",
+        "tags": ["Certification"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AgentProfile"
-              }
+              "schema": { "$ref": "#/components/schemas/AgentProfile" }
             }
           }
         },
         "responses": {
           "202": {
-            "description": "Accepted. The test run has been successfully initiated.",
+            "description": "Accepted. Certification run initiated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37,198 +33,283 @@
                     "testRunId": {
                       "type": "string",
                       "format": "uuid",
-                      "description": "The unique identifier for this test run.",
+                      "description": "Unique identifier for this certification run.",
                       "example": "a7b1cde2-f345-6789-abcd-ef0123456789"
+                    },
+                    "estimatedLayerCount": {
+                      "type": "integer",
+                      "description": "Number of layers that will execute based on autonomy_level_claim.",
+                      "example": 3
                     }
                   }
                 }
               }
             }
           },
-          "400": {
-            "description": "Bad Request. The provided agent profile is invalid.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
+          "400": { "description": "Bad Request. Agent Profile schema invalid.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Unprocessable Entity. autonomy_level_claim requires fields not present in profile.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
     "/test-runs/{testRunId}": {
       "get": {
-        "summary": "Query Test Status",
-        "description": "Retrieves the current status of a compliance test run using its testRunId.",
-        "operationId": "getTestRunStatus",
+        "summary": "Query Certification Run Status",
+        "operationId": "getCertificationRunStatus",
+        "tags": ["Certification"],
         "parameters": [
-          {
-            "name": "testRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
+          { "name": "testRunId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": {
           "200": {
-            "description": "Current status of the test run.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TestRunStatus"
-                }
-              }
-            }
+            "description": "Current status of the certification run.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CertificationRunStatus" } } }
           },
-          "404": {
-            "description": "Not Found. The specified testRunId does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
+          "404": { "description": "Not Found.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
     "/test-runs/{testRunId}/certificate": {
       "get": {
         "summary": "Retrieve Compliance Certificate",
-        "description": "Fetches the final compliance result for a completed test run. If the test was successful, this includes a machine-readable Compliance Certificate.",
+        "description": "Fetches the final CertificationResult for a completed run, including the signed JWT Compliance Certificate and the autonomy_level_achieved.",
         "operationId": "getComplianceCertificate",
+        "tags": ["Certification"],
         "parameters": [
-          {
-            "name": "testRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
+          { "name": "testRunId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": {
           "200": {
-            "description": "Compliance result and certificate.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ComplianceResult"
-                }
-              }
-            }
+            "description": "Final certification result with Compliance Certificate.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CertificationResult" } } }
           },
-          "404": {
-            "description": "Not Found. The specified testRunId does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity. The test run has not yet completed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
+          "404": { "description": "Not Found.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "422": { "description": "Unprocessable Entity. Run has not completed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token issued by the ACE-NET auth service. Required RBAC roles: operator, CI/CD submitter."
+      }
+    },
     "schemas": {
       "AgentProfile": {
         "type": "object",
+        "description": "Signed JSON document submitted by the agent provider to initiate certification. See Section 5.1 of the ACE-NET specification.",
+        "required": ["agentId", "agentVersion", "provider", "agentArtifactUrl", "autonomy_level_claim"],
         "properties": {
-          "agentName": {
+          "profileVersion": {
             "type": "string",
-            "example": "5G-UPF-Agent"
+            "description": "Schema version of this Agent Profile document.",
+            "example": "2.0"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uri",
+            "description": "Stable URN identifying the agent across versions.",
+            "example": "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
           },
           "agentVersion": {
             "type": "string",
-            "example": "v2.1.4"
+            "example": "3.0.1"
           },
-          "vendor": {
+          "provider": {
             "type": "string",
-            "example": "NetCo"
+            "example": "VendorX"
+          },
+          "description": {
+            "type": "string",
+            "example": "Multi-domain complaint handling agent — network, billing, and CRM triage via A2A-T."
           },
           "agentArtifactUrl": {
             "type": "string",
             "format": "uri",
-            "description": "URL to the agent's deployment artifact (e.g., container image, package).",
-            "example": "oci://registry.example.com/netco/upf-agent:v2.1.4"
+            "description": "URI to the deployable container image or Helm chart.",
+            "example": "oci://registry.example.com/vendorx/agent:3.0.1"
+          },
+          "autonomy_level_claim": {
+            "type": "string",
+            "enum": ["L0", "L1", "L2", "L3", "L4"],
+            "description": "Declared target TMForum IG1218 autonomy level. Determines which certification layers execute."
+          },
+          "a2at_endpoint": {
+            "type": "string",
+            "format": "uri",
+            "description": "Base URL for A2A-T Agent Card (/.well-known/agent.json). REQUIRED for L3/L4.",
+            "example": "https://agent.vendorx.example.com"
+          },
+          "scenario_profile_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["HVS-1", "HVS-2", "HVS-3", "HVS-4", "HVS-5"]
+            },
+            "description": "HVS scenarios to execute in Layer 3. REQUIRED for L3/L4.",
+            "example": ["HVS-5", "HVS-1"]
+          },
+          "interfaces": {
+            "type": "array",
+            "description": "TMF or protocol interfaces the agent consumes.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "example": "TMF654" },
+                "version": { "type": "string", "example": "4.0" },
+                "role": { "type": "string", "example": "trouble-ticket" }
+              }
+            }
+          },
+          "resourceRequirements": {
+            "type": "object",
+            "properties": {
+              "cpu": { "type": "string", "example": "2000m" },
+              "memory": { "type": "string", "example": "4Gi" },
+              "storage": { "type": "string", "example": "10Gi" }
+            }
+          },
+          "sidecar": {
+            "type": "object",
+            "description": "TEA instrumentation layer configuration.",
+            "properties": {
+              "enabled": { "type": "boolean", "default": true },
+              "langfuse_project": { "type": "string", "example": "ace-net-cert" },
+              "intercept_tmf_apis": {
+                "type": "boolean",
+                "description": "Enable TEA TMF OpenAPI Plugin to intercept and validate all TMF tool invocations (equivalent to MCP server interception in general agent frameworks).",
+                "default": true
+              },
+              "intercept_a2at": {
+                "type": "boolean",
+                "description": "Enable A2A-T Plugin interception. REQUIRED for L3/L4.",
+                "default": false
+              }
+            }
           },
           "policyProfileId": {
             "type": "string",
-            "description": "ID of the compliance policy profile to use for testing.",
-            "example": "nist-security-baseline-v3"
-          }
-        },
-        "required": ["agentName", "agentVersion", "vendor", "agentArtifactUrl", "policyProfileId"]
-      },
-      "TestRunStatus": {
-        "type": "object",
-        "properties": {
-          "testRunId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["PENDING", "PROVISIONING", "RUNNING", "COMPLETED", "FAILED"]
-          },
-          "lastUpdated": {
-            "type": "string",
-            "format": "date-time"
+            "description": "ID of the ace-policy.yang policy instance to apply. Defaults to operator's active baseline policy."
           }
         }
       },
-      "ComplianceResult": {
+      "CertificationRunStatus": {
         "type": "object",
+        "description": "Current state of a certification run across all layers.",
         "properties": {
-          "testRunId": {
+          "testRunId": { "type": "string", "format": "uuid" },
+          "status": {
             "type": "string",
-            "format": "uuid"
+            "enum": [
+              "PENDING",
+              "PROVISIONING",
+              "LAYER1_RUNNING",
+              "LAYER1_COMPLETE",
+              "LAYER2_RUNNING",
+              "LAYER2_COMPLETE",
+              "LAYER3_RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "description": "Current lifecycle state. Layer-specific states indicate active certification layer."
           },
+          "current_layer": {
+            "type": "integer",
+            "description": "Active certification layer (1, 2, or 3). Absent when PENDING or COMPLETED."
+          },
+          "layer1_score": {
+            "type": "number",
+            "description": "Behavioral score so far. Available while LAYER1_RUNNING.",
+            "example": 85.3
+          },
+          "lastUpdated": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CertificationResult": {
+        "type": "object",
+        "description": "Final three-layer certification outcome. Maps to the ace-audit.yang certification-report structure.",
+        "properties": {
+          "testRunId": { "type": "string", "format": "uuid" },
           "overallStatus": {
             "type": "string",
-            "enum": ["SUCCESS", "FAILURE"],
-            "description": "The final pass/fail outcome of the test run."
+            "enum": ["PASS", "FAIL"],
+            "description": "Final pass/fail outcome across all executed layers."
           },
-          "summaryReportUrl": {
+          "autonomy_level_claimed": {
+            "type": "string",
+            "enum": ["L0", "L1", "L2", "L3", "L4"],
+            "description": "The autonomy level declared by the agent provider in the Agent Profile."
+          },
+          "autonomy_level_achieved": {
+            "type": "string",
+            "enum": ["L0", "L1", "L2", "L3", "L4"],
+            "description": "Computed by ACE-NET from certification evidence. Will be less than or equal to autonomy_level_claimed. MUST NOT be self-reported by the agent provider."
+          },
+          "layer1": {
+            "type": "object",
+            "description": "Layer 1 Behavioral certification results (ACE Phase 0-2 pipeline output).",
+            "properties": {
+              "behavioral-score": { "type": "number", "description": "0.0–100.0. Must meet behavioral-score-threshold in active policy.", "example": 87.5 },
+              "rules-evaluated": { "type": "integer", "example": 24 },
+              "rules-passed": { "type": "integer", "example": 21 },
+              "tmf-api-conformance": { "type": "string", "enum": ["PASS", "FAIL"], "description": "Pass/fail for TMF Open API tool invocation correctness (schema, semantics, sequencing)." },
+              "ttd-p95-seconds": { "type": "number", "description": "95th percentile Time to Detect across all fault injections.", "example": 12.4 },
+              "ttr-p95-seconds": { "type": "number", "description": "95th percentile Time to Remediate across all fault injections.", "example": 47.8 },
+              "tool-call-accuracy": { "type": "number", "description": "Fraction of TMF API calls with correct schema and semantics (0.0–1.0).", "example": 0.96 }
+            }
+          },
+          "layer2": {
+            "type": "object",
+            "description": "Layer 2 A2A-T Protocol conformance results (IG1453). Present only for L3/L4.",
+            "properties": {
+              "ig1453-version": { "type": "string", "example": "v2.1.0" },
+              "agent-card-valid": { "type": "boolean" },
+              "task-lifecycle": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"], "description": "Phase A: Agent Card + task CREATE/SUBMIT/COMPLETE lifecycle." },
+              "multi-agent-flow": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"], "description": "Phase B: Registry discovery + multi-agent delegation." },
+              "error-handling": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"], "description": "Phase C: Agent Fabric fault resilience." },
+              "prompt-meta-model": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"], "description": "Phase D: IG1453A Prompt Meta-Model + prompt injection rejection." },
+              "fabric-faults-passed": { "type": "integer", "description": "Number of fabric fault scenarios passed out of 4.", "example": 3 }
+            }
+          },
+          "layer3-hvs-results": {
+            "type": "array",
+            "description": "Per-HVS scenario results (IG1401 High-Value Scenarios). One entry per scenario in scenario_profile_ids. Present only for L3/L4.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hvs-id": { "type": "string", "enum": ["HVS-1", "HVS-2", "HVS-3", "HVS-4", "HVS-5"] },
+                "status": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"] },
+                "elapsed-seconds": { "type": "integer", "example": 438 },
+                "sla-seconds": { "type": "integer", "description": "Declared SLA threshold for this scenario.", "example": 600 },
+                "intent-fulfilled": { "type": "boolean" },
+                "failure-reason": { "type": "string", "description": "Present only when status is FAIL." }
+              }
+            }
+          },
+          "intent-fulfillment-rate": {
+            "type": "number",
+            "description": "Fraction of HVS scenarios where intent was fulfilled (0.0–1.0). Present only for L3/L4.",
+            "example": 0.8
+          },
+          "compliance-certificate": {
+            "type": "string",
+            "description": "Signed JWT (JWS compact serialization) of the Compliance Certificate. Present only when overallStatus is PASS. Signed by ACE-NET CA using RS256 or ES256."
+          },
+          "evidence-report-url": {
             "type": "string",
             "format": "uri",
-            "description": "A URL to a human-readable summary of the test results."
-          },
-          "complianceCertificate": {
-            "type": "string",
-            "description": "A signed JSON Web Token (JWT) issued by ACE-NET upon successful compliance verification. The JWT contains claims about the agent and the test context. Present only if overallStatus is 'SUCCESS'."
+            "description": "URL to the human-readable Evidence Report PDF (ACE Phase 3 output)."
           }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
+          "code": { "type": "string" },
+          "message": { "type": "string" }
         }
       }
     }

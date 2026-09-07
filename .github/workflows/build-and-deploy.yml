@@ -35,14 +35,6 @@ jobs:
           # files will be concatenated in the correct sequence.
           cat spec/*.md > combined_spec.md
 
-      - name: Render PlantUML diagrams to SVG
-        uses: plantuml/plantuml-action@v2
-        with:
-          # Find all .puml files in the diagrams directory
-          files: "diagrams/*.puml"
-          # Output the rendered SVG files to an 'assets' directory
-          output: "assets"
-          
       - name: Set up Pandoc
         uses: r-lib/actions/setup-pandoc@v2
 
